@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>TwitchNotifier</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="TwitchNotifier - Recevez des notifications pour vos chaînes Twitch préférées.">
+    <meta name="keywords" content="Twitch, notifications, chaînes, streaming">
+    <favicon rel="icon" href="./src/logo.png" type="image/png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="logo"> <img src="./src/logo.png" alt="Logo TwitchNotifier" class="logo-img"> TwitchNotifier</h1>
+
+        <form id="add-form">
+            <input type="text" id="channel-name" placeholder="Nom de la chaîne en minuscule" required>
+            <button type="submit">Ajouter</button>
+        </form>
+
+        <h2 class="channels">Chaînes surveillées :</h2>
+        <ul id="channel-list"></ul>
+
+        <p id="next-check" data-next="">Prochaine vérification dans : ...</p>
+        <div id="progress-bar-container">
+            <div id="progress-bar">
+                <span id="progress"></span>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
