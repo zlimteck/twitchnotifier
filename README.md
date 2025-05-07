@@ -21,8 +21,8 @@ Application de notification pour les streamers Twitch qui alerte les utilisateur
 
 1. Cloner le dépôt :
    ```bash
-   git clone https://github.com/votre-utilisateur/twitch-notifier-v2.git
-   cd twitch-notifier-v2
+   git clone https://github.com/zlimteck/twitchnotifier.git
+   cd twitchnotifier
    ```
 
 2. Installer les dépendances :
@@ -52,9 +52,5 @@ Pour lancer l'application en mode développement :
 ```bash
 # Démarrage du serveur backend
 cd backend
-npm run dev
-
-# Dans un autre terminal, démarrez le frontend
-cd frontend
-npm start
+node server.js
 ```
