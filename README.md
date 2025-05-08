@@ -1,21 +1,22 @@
 # Twitch Notifier
 
-Application de notification pour les streamers Twitch qui alerte les utilisateurs lorsqu'un streamer commence à diffuser.
+![image](https://zupimages.net/up/25/18/afmv.png)
+
+Application de notification via pushover pour les lives Twitch, avec interface web pour ajouter et supprimer les chaînes à surveiller.
 
 ## 🚀 Fonctionnalités
 
 - Notification en temps réel des streams Twitch
 - Interface utilisateur moderne et réactive
-- Configuration personnalisable des notifications
-- Support multi-utilisateur
-- Historique des streams
+
+![image](https://zupimages.net/up/25/19/mb4q.png)
 
 ## 🛠 Prérequis
 
 - Node.js (v16 ou supérieur)
 - npm ou yarn
 - Compte Twitch avec accès à l'API
-- Compte de service pour les notifications (si nécessaire)
+- Compte Pushover
 
 ## 🚀 Installation
 
@@ -47,10 +48,22 @@ Application de notification pour les streamers Twitch qui alerte les utilisateur
 
 ## 🚦 Démarrage
 
-Pour lancer l'application en mode développement :
+Lancer l'application en mode développement :
 
 ```bash
 # Démarrage du serveur backend
 cd backend
 node server.js
 ```
+
+Lancer l'application via Docker :
+
+```bash
+docker build -t twitchnotifier .
+docker run -d \
+  --env-file backend/.env \
+  -p 3786:3786 \
+  --name twitchnotifier \
+  -v /path/to/backend/channels.json:/app/backend/channels.json \
+  twitchnotifier
+```   
