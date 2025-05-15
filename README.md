@@ -2,11 +2,11 @@
 
 ![image](https://zupimages.net/up/25/18/afmv.png)
 
-Application de notification via pushover pour les lives Twitch, avec interface web pour ajouter et supprimer les chaînes à surveiller.
+Application de notification via pushover et discord pour les lives Twitch, avec interface web pour ajouter et supprimer les chaînes à surveiller.
 
 ## 🚀 Fonctionnalités
 
-- Notification en temps réel des streams Twitch
+- Notification en temps réel des streams Twitch via pushover et discord
 - Interface utilisateur moderne et réactive
 
 ![image](https://zupimages.net/up/25/19/mb4q.png)
@@ -17,6 +17,7 @@ Application de notification via pushover pour les lives Twitch, avec interface w
 - npm ou yarn
 - Compte Twitch avec accès à l'API
 - Compte Pushover
+- Compte Discord
 
 ## 🚀 Installation
 
@@ -44,6 +45,7 @@ Application de notification via pushover pour les lives Twitch, avec interface w
    TWITCH_CLIENT_SECRET=secret
    TWITCH_REFRESH_TOKEN=token
    PORT=port
+   DISCORD_WEBHOOK_URL=webhook
    ```
 
 ## 🚦 Démarrage
