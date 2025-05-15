@@ -8,6 +8,33 @@ const axios = require('axios');
 const Push = require('pushover-notifications');
 const colors = require('colors');
 require('dotenv').config();
+
+// Fonction utilitaire pour envoyer une notification Discord via Webhook
+async function sendDiscordNotification(message) {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+  try {
+    await axios.post(webhookUrl, {
+      content: message
+    });
+    console.log(colors.blue('✅ Notification Discord envoyée !'));
+  } catch (err) {
+    console.error(colors.red('Erreur envoi Discord Webhook :'), err.message);
+  }
+}
+
+// Fonction utilitaire pour envoyer un embed Discord
+async function sendDiscordEmbedToDiscord(embed) {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+  try {
+    await axios.post(webhookUrl, { embeds: [embed] });
+    console.log(colors.blue('✅ Embed Discord envoyé !'));
+  } catch (err) {
+    console.error(colors.red('Erreur envoi Discord Embed :'), err.message);
+  }
+}
+
 const CHANNELS_FILE = path.join(__dirname, 'channels.json');
 let channels = [];
 let streamStatuses = {};
@@ -41,9 +68,21 @@ async function getAccessToken() {
       client_id: process.env.TWITCH_CLIENT_ID,
       client_secret: process.env.TWITCH_CLIENT_SECRET,
     });
-    const response = await axios.post(url, params);
-    accessToken = response.data.access_token;
-    accessTokenExpiration = Date.now() + response.data.expires_in * 1000;
+    try {
+      const response = await axios.post(url, params);
+      accessToken = response.data.access_token;
+      accessTokenExpiration = Date.now() + response.data.expires_in * 1000;
+    } catch (err) {
+      push.send({
+        title: 'TwitchNotifier: Connexion échouée',
+        message: `Impossible d’obtenir le token Twitch: ${err.message}`,
+        sound: 'siren',
+        priority: 1,
+      });
+      // Envoi notification Discord
+      sendDiscordNotification(`TwitchNotifier: Connexion échouée\nImpossible d’obtenir le token Twitch: ${err.message}`);
+      throw err;
+    }
   }
   return accessToken;
 }
@@ -58,7 +97,7 @@ async function checkStreamStatus(channelName) {
     const { data } = await axios.get(url, { headers });
     const stream = data.data[0];
     if (stream) {
-      const startedAt = new Date(stream.started_at).toLocaleString('fr-FR');
+      const startedAt = new Date(stream.started_at).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
       const thumbnailUrl = stream.thumbnail_url
         .replace('{width}', '640')
         .replace('{height}', '360');
@@ -72,7 +111,7 @@ async function checkStreamStatus(channelName) {
       if (streamStatuses[channelName] === 'offline') {
         const notification = {
           title: `${channelName} est en live !`,
-          message: `Jeu: ${stream.game_name}\nTitre: ${stream.title}\nViewers: ${stream.viewer_count}\nDepuis: ${startedAt}\nhttps://twitch.tv/${channelName}`,
+          message: `Jeu: ${stream.game_name}\n\nTitre: ${stream.title}\n\nViewers: ${stream.viewer_count}\n\nDepuis: ${startedAt}\n\nhttps://twitch.tv/${channelName}`,
           sound: 'magic',
           priority: 0,
         };
@@ -90,16 +129,75 @@ async function checkStreamStatus(channelName) {
             console.log(colors.green('✅ Notification Pushover envoyée avec image !'));
           }
         });
+        // Envoi notification Discord du lancement du stream
+        (async () => {
+          try {
+            // Récupération de l'avatar Twitch
+            const twitchUser = await axios.get(
+              `https://api.twitch.tv/helix/users?login=${channelName}`,
+              {
+                headers: {
+                  'Client-ID': process.env.TWITCH_CLIENT_ID,
+                  'Authorization': `Bearer ${await getAccessToken()}`,
+                },
+              }
+            );
+            const userData = twitchUser.data.data[0];
+            const avatar = userData ? userData.profile_image_url : undefined;
+            const embed = {
+              title: `${channelName} est en live !` ,
+              description: `**${stream.title}**\n\nJeu : ${stream.game_name}\n\nViewers : ${stream.viewer_count}\n\nDepuis : ${startedAt}`,
+              url: `https://twitch.tv/${channelName}`,
+              color: 0x9146FF,
+              thumbnail: avatar ? { url: avatar } : undefined,
+              image: { url: thumbnailUrl },
+              footer: { text: 'TwitchNotifier' },
+              timestamp: new Date().toISOString()
+            };
+            sendDiscordEmbedToDiscord(embed);
+          } catch (err) {
+            console.error(colors.red('Erreur récupération avatar Twitch :'), err.message);
+          }
+        })();
       }
       streamStatuses[channelName] = 'online';
     } else {
       if (streamStatuses[channelName] === 'online') {
         push.send({
           title: `${channelName} a terminé son stream`,
-          message: `Fin du stream: ${new Date().toLocaleString('fr-FR')}`,
+          message: `Fin du stream: ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`,
           sound: 'magic',
           priority: 0,
         });
+        // Envoi notification Discord de la fin du stream
+        (async () => {
+          try {
+            // Récupération de l'avatar Twitch
+            const twitchUser = await axios.get(
+              `https://api.twitch.tv/helix/users?login=${channelName}`,
+              {
+                headers: {
+                  'Client-ID': process.env.TWITCH_CLIENT_ID,
+                  'Authorization': `Bearer ${await getAccessToken()}`,
+                },
+              }
+            );
+            const userData = twitchUser.data.data[0];
+            const avatar = userData ? userData.profile_image_url : undefined;
+            const embed = {
+              title: `${channelName} est hors ligne !`,
+              description: `Le stream est terminé.\n\nFin : ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`,
+              url: `https://twitch.tv/${channelName}`,
+              color: 0x99aab5, // Gris Discord
+              thumbnail: avatar ? { url: avatar } : undefined,
+              footer: { text: 'TwitchNotifier' },
+              timestamp: new Date().toISOString()
+            };
+            sendDiscordEmbedToDiscord(embed);
+          } catch (err) {
+            console.error(colors.red('Erreur récupération avatar Twitch :'), err.message);
+          }
+        })();
       }
       streamStatuses[channelName] = 'offline';
     }
@@ -246,6 +344,33 @@ app.post('/api/channels', (req, res) => {
       console.log(colors.green('✅ Notification Pushover envoyée !'));
     }
   });
+  // Envoi notification Discord de l'ajout de la nouvelle chaîne
+  (async () => {
+    try {
+      const twitchUser = await axios.get(
+        `https://api.twitch.tv/helix/users?login=${name}`,
+        {
+          headers: {
+            'Client-ID': process.env.TWITCH_CLIENT_ID,
+            'Authorization': `Bearer ${await getAccessToken()}`,
+          },
+        }
+      );
+      const userData = twitchUser.data.data[0];
+      const avatar = userData ? userData.profile_image_url : undefined;
+      const embed = {
+        title: 'Chaîne ajoutée',
+        description: `**${name}** a été ajoutée à TwitchNotifier !`,
+        color: 0x57F287, // Vert Discord
+        thumbnail: avatar ? { url: avatar } : undefined,
+        footer: { text: 'TwitchNotifier' },
+        timestamp: new Date().toISOString()
+      };
+      sendDiscordEmbedToDiscord(embed);
+    } catch (err) {
+      console.error(colors.red('Erreur récupération avatar Twitch :'), err.message);
+    }
+  })();
 });
 app.delete('/api/channels/:name', (req, res) => {
   const { name } = req.params;
@@ -269,20 +394,64 @@ app.delete('/api/channels/:name', (req, res) => {
       console.log(colors.green('✅ Notification Pushover envoyée !'));
     }
   });
+  // Envoi notification Discord de la suppression de la chaîne
+  (async () => {
+    try {
+      const twitchUser = await axios.get(
+        `https://api.twitch.tv/helix/users?login=${name}`,
+        {
+          headers: {
+            'Client-ID': process.env.TWITCH_CLIENT_ID,
+            'Authorization': `Bearer ${await getAccessToken()}`,
+          },
+        }
+      );
+      const userData = twitchUser.data.data[0];
+      const avatar = userData ? userData.profile_image_url : undefined;
+      const embed = {
+        title: 'Chaîne supprimée',
+        description: `**${name}** a été supprimée de TwitchNotifier.`,
+        color: 0xED4245, // Rouge Discord
+        thumbnail: avatar ? { url: avatar } : undefined,
+        footer: { text: 'TwitchNotifier' },
+        timestamp: new Date().toISOString()
+      };
+      sendDiscordEmbedToDiscord(embed);
+    } catch (err) {
+      console.error(colors.red('Erreur récupération avatar Twitch :'), err.message);
+    }
+  })();
 });
 app.get('/api/next-check', (req, res) => {
   res.json({ nextCheck: nextCheckTime.toISOString() });
 });
 
+// Détection de l'IP locale principale
+const interfaces = os.networkInterfaces();
+let localIp = 'localhost';
+for (const name of Object.keys(interfaces)) {
+  for (const iface of interfaces[name]) {
+    if (iface.family === 'IPv4' && !iface.internal) {
+      localIp = iface.address;
+      break;
+    }
+  }
+  if (localIp !== 'localhost') break;
+}
+
 app.listen(port, () => {
-  console.log(colors.green(`🚀 API backend lancée sur http://localhost:${port}/api/status`));
+  console.log(colors.green(`🚀 API backend lancée sur http://${localIp}:${port}/api/status`));
+  const webhookStatus = process.env.DISCORD_WEBHOOK_URL ? '✅ Webhook Discord configuré' : '❌ Webhook Discord non configuré';
+  const pushoverStatus = process.env.PUSHOVER_TOKEN ? '✅ Pushover configuré' : '❌ Pushover non configuré';
+  console.log(colors.cyan(`Statut Discord Webhook : ${webhookStatus}`));
+  console.log(colors.cyan(`Statut Pushover : ${pushoverStatus}`));
 });
 //verification du statut du frontend
 const frontendUrl = process.env.FRONTEND_URL || `http://localhost:${port}`;
 axios.get(frontendUrl)
   .then(response => {
     if (response.status === 200) {
-      console.log(colors.green(`✅ Frontend accessible sur ${frontendUrl}`));
+      console.log(colors.green(`✅ Frontend accessible sur ${frontendUrl} (http://${localIp}:${port})`));
     } else {
       console.error(colors.red(`Erreur d'accès au frontend: ${response.status}`));
     }
@@ -290,10 +459,12 @@ axios.get(frontendUrl)
   .catch(error => {
     console.error(colors.red(`Erreur d'accès au frontend: ${error.message}`));
 });
-//verifie la connexion pushover
+//verifie la connexion pushover et si un webhook est configuré
+const webhookStatus = process.env.DISCORD_WEBHOOK_URL ? '✅ Webhook Discord configuré' : '❌ Webhook Discord non configuré';
+const pushoverStatus = process.env.PUSHOVER_TOKEN ? '✅ Pushover configuré' : '❌ Pushover non configuré';
 push.send({
     title: 'TwitchNotifier',
-    message: `Exécution de TwitchNotifier BACKEND/FRONTED PORT: ${port}`,
+    message: `🚀 Exécution de TwitchNotifier\n\n✅ API accessible sur http://${localIp}:${port}/api/status\n\n✅ Frontend accessible sur ${frontendUrl} (http://${localIp}:${port})\n\n${pushoverStatus}\n\n${webhookStatus}`,
     sound: 'magic',
     priority: 0,
   }, (err, result) => {
